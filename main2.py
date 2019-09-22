@@ -232,3 +232,5 @@ def main(screen=(720, 1024)):
 
 if __name__ == '__main__':
     main()
+
+# hej, jetssem Eryk
