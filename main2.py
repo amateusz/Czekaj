@@ -13,11 +13,9 @@ from colour import Color
 
 # Brush size in pixels.
 BRUSH = 45
+
+
 # Actual size is 2*BRUSH
-
-
-
-
 
 
 def create_image(filename, width, height):
@@ -45,8 +43,8 @@ def create_image(filename, width, height):
         return img.resize((int(width), int(height)), Image.ANTIALIAS)
     else:  # Keep aspect ratio.
         w, h = img.size
-        scale = width/float(w) if width else height/float(h)
-        return img.resize((int(w*scale), int(h*scale)), Image.ANTIALIAS)
+        scale = width / float(w) if width else height / float(h)
+        return img.resize((int(w * scale), int(h * scale)), Image.ANTIALIAS)
 
 
 class Home(object):
@@ -54,6 +52,7 @@ class Home(object):
     master: tk.Tk window.
     screen: tuple, (width, height).
     """
+
     def __init__(self, master, screen):
         self.screen = w, h = screen
         self.master = master
@@ -70,7 +69,7 @@ class Home(object):
         self.image3 = create_image(self.fname2, w, h)
 
         # Center of screen.
-        self.center = w//2, h//2
+        self.center = w // 2, h // 2
         # Start with no photo on the screen.
         self.photo = False
 
@@ -152,8 +151,8 @@ class Home(object):
                     self.mask_list.append([i, j])
         print(self.mask_list)
         for coords in self.mask_list:
-            a = coords[0]*self.heat_w+self.heat_w//2
-            b = coords[1]*self.heat_h+self.heat_h//2
+            a = coords[0] * self.heat_w + self.heat_w // 2
+            b = coords[1] * self.heat_h + self.heat_h // 2
             for x in range(a - r, a + r + 1):
                 for y in range(b - r, b + r + 1):
                     try:
@@ -178,7 +177,8 @@ class Home(object):
                                 p = self.image1.getpixel((x, y))
                                 self.image2.putpixel((x, y), p)
                                 '''
-                        if (x - a) * (x - a) + (y - b) * (y - b) <= r * r * random() ** 2:  # version with random gradient
+                        if (x - a) * (x - a) + (y - b) * (
+                                y - b) <= r * r * random() ** 2:  # version with random gradient
                             p = self.image1.getpixel((x, y))
                             self.image2.putpixel((x, y), p)
 
@@ -191,8 +191,9 @@ class Home(object):
                 for y in range(self.pos[0][1] - r, self.pos[0][1] + r + 1):
                     try:
                         if (
-                            (x - self.pos[0][0]) * (x - self.pos[0][0]) + (y - self.pos[0][1]) * (y - self.pos[0][1]) <= r * r
-                            and random() > 0.7
+                                (x - self.pos[0][0]) * (x - self.pos[0][0]) + (y - self.pos[0][1]) * (
+                                y - self.pos[0][1]) <= r * r
+                                and random() > 0.7
                         ):
                             q = self.image3.getpixel((x, y))
                             self.image2.putpixel((x, y), q)
@@ -219,8 +220,9 @@ class Home(object):
         for h in range(len(self.map)):
             for w in range(len(self.map[0])):
                 color = Color(hsl=(self.map[h][w], 1, 0.5))
-                self.create_rectangle(w*self.heat_w, h*self.heat_h,
-                                      w*self.heat_w+self.heat_w, h*self.heat_h+self.heat_h, fill="%s" % color, alpha=.5)
+                self.create_rectangle(w * self.heat_w, h * self.heat_h,
+                                      w * self.heat_w + self.heat_w, h * self.heat_h + self.heat_h, fill="%s" % color,
+                                      alpha=.5)
 
 
 def main(screen=(720, 1024)):
