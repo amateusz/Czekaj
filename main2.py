@@ -234,3 +234,5 @@ def main(screen=(720, 1024)):
 
 if __name__ == '__main__':
     main()
+
+# amateusz has changes a lot… (test)
