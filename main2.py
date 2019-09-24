@@ -80,7 +80,7 @@ class HomeWindow():
         # declare a heatmap
         self.heatmap_alpha_auto = 0
 
-        self.map = [
+        self.heatmap = [
             [0.1, 0.1, 0.40, 0.60, 0.24, 0.1],
             [0.1, 0.18, 0.30, 0.50, 0.2, 0.1],
             [0.1, 0.15, 0.35, 0.45, 0.2, 0.1],
@@ -93,28 +93,27 @@ class HomeWindow():
         ]
 
         # size of heatmap tiles in pixels based on self.map 2d list and size of an image
-        self.heat_tile_w = self.canvas_size[0] / len(self.map[0])
-        self.heat_tile_h = self.canvas_size[1] / len(self.map)
+        self.heat_tile_w = self.canvas_size[0] / len(self.heatmap[0])
+        self.heat_tile_h = self.canvas_size[1] / len(self.heatmap)
 
         # value of targeted areas
-        self.mask = 0
+        self.mask = .1
 
         # mask_list populates with indexes of matching values with self.mask after erase function is called
         self.mask_list = []
         self.heat()
-        self.erase(0, 0)
+        self.unblur()
 
         # Key bindings.
         self.parent.bind('<Button-1>', self.click_callback)
         self.parent.bind("<Return>", self.reset)
         self.parent.bind('<Escape>', self.parent.destroy)
-        self.parent.bind("<Motion>", self.erase_mouse)
+        self.parent.bind("<Motion>", self.unblur_mouse)
 
     def click_callback(self, event):
         if event.num == 1:
-            self.heatmap_alpha_auto += 1/3
+            self.heatmap_alpha_auto += 1 / 3
             self.heatmap_alpha_auto %= 1.01
-
 
     def loadImages(self, filenames=None):
         if not filenames or len(filenames) != 2:
@@ -147,29 +146,30 @@ class HomeWindow():
         self.frame.destroy()
         self.__init__(self.parent, self.canvas_size)
 
-    def erase_mouse(self, event):
-        print(event)
-        self.erase(event.x, event.y)
+    def unblur_mouse(self, event):
+        self.unblur()
 
-    def erase(self, a, b):
+    def unblur(self, heat=None):
         """
         Mouse motion binding.
         Erase part of top image (self.photo2) at location (event.x, event.y),
         consequently exposing part of the bottom image (self.photo1).
         n - number of circles shown at any moment of time
-        """
 
+        it works like this:
+        """
+        print(heat)
         # a, b = event.x, event.y
         r = BRUSH
-        self.pos.append((a, b))
-        n = 60
+        # self.pos.append((a, b))
+        n = 2
         # mask_list = [(i for i, x in enumerate(self.map)) if x == self.mask]
 
-        for vertical in range(len(self.map)):
-            for i, horizontal in enumerate(self.map[vertical]):
-                if horizontal == self.mask:
-                    self.mask_list.append([i, vertical])
-        print(self.mask_list)
+        # for vertical in range(len(self.heatmap)):
+        #     for i, horizontal in enumerate(self.heatmap[vertical]):
+        #         if horizontal == self.mask:
+        #             self.mask_list.append([i, vertical])
+        # print(self.mask_list)
         for coords in self.mask_list:
             a = int(coords[0] * self.heat_tile_w + self.heat_tile_w / 2)
             b = int(coords[1] * self.heat_tile_h + self.heat_tile_h / 2)
@@ -238,9 +238,9 @@ class HomeWindow():
 
     # draw a heatmap
     def heat(self):
-        for vertical in range(len(self.map)):
-            for horizontal in range(len(self.map[0])):
-                color = Color(hsl=(.9, 1, self.map[vertical][horizontal] / 2))
+        for vertical in range(len(self.heatmap)):
+            for horizontal in range(len(self.heatmap[0])):
+                color = Color(hsl=(.9, 1, self.heatmap[vertical][horizontal] / 2))
                 self.create_rectangle(int(horizontal * self.heat_tile_w), \
                                       int(vertical * self.heat_tile_h), \
                                       int(horizontal * self.heat_tile_w + self.heat_tile_w), \
