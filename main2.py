@@ -54,7 +54,6 @@ class HomeWindow():
     """
 
     def __init__(self, master, canvas_size, filenames=None):
-        print(canvas_size)
         self.canvas_size = canvas_size  # policy: everything stretched to fill this size. no aspect preservation
         self.parent = master
 
@@ -73,26 +72,24 @@ class HomeWindow():
         # Draw photo on screen.
         self.draw()
 
-        # Key bindings.
-        self.parent.bind("<Return>", self.reset)
-        # self.master.bind("<Motion>", self.erase)
-
         self.pos = []
 
         # for creating self transparent rectangles
         self.images = []
 
         # declare a heatmap
+        self.heatmap_alpha_auto = 0
+
         self.map = [
-            [0.1, 0.1, 0.40, 0.60, 0.1, 0.1],
-            [0.1, 0.1, 0.30, 0.50, 0.1, 0.1],
-            [0.1, 0.1, 0.35, 0.45, 0.1, 0.1],
-            [0.1, 0.1, 0.35, 0.40, 0.1, 0.1],
-            [0.1, 0.1, 0.30, 0.35, 0.1, 0.1],
-            [0.1, 0.1, 0.20, 0.30, 0.1, 0.1],
-            [0.1, 0.1, 0.15, 0.25, 0.1, 0.1],
-            [0.1, 0.1, 0.15, 0.20, 0.1, 0.1],
-            [0.1, 0.1, 0.10, 0.10, 0.1, 0.1],
+            [0.1, 0.1, 0.40, 0.60, 0.24, 0.1],
+            [0.1, 0.18, 0.30, 0.50, 0.2, 0.1],
+            [0.1, 0.15, 0.35, 0.45, 0.2, 0.1],
+            [0.1, 0.15, 0.35, 0.40, 0.2, 0.1],
+            [0.1, 0.1, 0.30, 0.35, 0.18, 0.1],
+            [0.1, 0.1, 0.20, 0.30, 0.17, 0.1],
+            [0.1, 0.1, 0.15, 0.25, 0.16, 0.1],
+            [0.1, 0.1, 0.15, 0.20, 0.13, 0.1],
+            [0.1, 0.1, 0.10, 0.10, 0.12, 0.1],
         ]
 
         # size of heatmap tiles in pixels based on self.map 2d list and size of an image
@@ -105,7 +102,19 @@ class HomeWindow():
         # mask_list populates with indexes of matching values with self.mask after erase function is called
         self.mask_list = []
         self.heat()
-        self.blur_action(0, 0)
+        self.erase(0, 0)
+
+        # Key bindings.
+        self.parent.bind('<Button-1>', self.click_callback)
+        self.parent.bind("<Return>", self.reset)
+        self.parent.bind('<Escape>', self.parent.destroy)
+        self.parent.bind("<Motion>", self.erase_mouse)
+
+    def click_callback(self, event):
+        if event.num == 1:
+            self.heatmap_alpha_auto += 1/3
+            self.heatmap_alpha_auto %= 1.01
+
 
     def loadImages(self, filenames=None):
         if not filenames or len(filenames) != 2:
@@ -138,8 +147,11 @@ class HomeWindow():
         self.frame.destroy()
         self.__init__(self.parent, self.canvas_size)
 
-    # def erase(self, event):
-    def blur_action(self, a, b):
+    def erase_mouse(self, event):
+        print(event)
+        self.erase(event.x, event.y)
+
+    def erase(self, a, b):
         """
         Mouse motion binding.
         Erase part of top image (self.photo2) at location (event.x, event.y),
@@ -210,14 +222,14 @@ class HomeWindow():
             self.pos.pop(0)
         # print(self.pos)
         self.draw()
-        self.heat()
+        if self.heatmap_alpha_auto:
+            self.heat()
 
     # creating semi-transparent images
     def create_rectangle(self, x1, y1, x2, y2, **kwargs):
         if 'alpha' in kwargs:
             alpha = int(kwargs.pop('alpha') * 255)
             fill = kwargs.pop('fill')
-            print(self.parent.winfo_rgb(fill))
             fill_mixed = ImageColor.getrgb(fill) + (alpha,)
             image = Image.new('RGBA', (x2 - x1, y2 - y1), fill_mixed)
             self.images.append(ImageTk.PhotoImage(image))
@@ -226,14 +238,14 @@ class HomeWindow():
 
     # draw a heatmap
     def heat(self):
-        for h in range(len(self.map)):
-            for w in range(len(self.map[0])):
-                color = Color(hsl=(self.map[h][w], .9, 0.5))
-                self.create_rectangle(int(w * self.heat_tile_w), \
-                                      int(h * self.heat_tile_h), \
-                                      int(w * self.heat_tile_w + self.heat_tile_w), \
-                                      int(h * self.heat_tile_h + self.heat_tile_h), \
-                                      fill="%s" % color, alpha=.5)
+        for vertical in range(len(self.map)):
+            for horizontal in range(len(self.map[0])):
+                color = Color(hsl=(.9, 1, self.map[vertical][horizontal] / 2))
+                self.create_rectangle(int(horizontal * self.heat_tile_w), \
+                                      int(vertical * self.heat_tile_h), \
+                                      int(horizontal * self.heat_tile_w + self.heat_tile_w), \
+                                      int(vertical * self.heat_tile_h + self.heat_tile_h), \
+                                      fill="%s" % color, alpha=self.heatmap_alpha_auto)
 
 
 def main(window_size=None):
