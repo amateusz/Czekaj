@@ -115,7 +115,8 @@ class BlurApp():
         self.parent.bind("<Return>", self.reset)
         self.parent.bind('<Escape>', self.exit)
         self.parent.bind("<Motion>", self.unblur_mouse)
-
+        self.parent.bind('<Control-q>', lambda
+            e: self.parent.quit())  # https://stackoverflow.com/questions/35788535/typeerror-quit-takes-1-positional-argument-but-2-were-given-keyboard-bind
         # Draw photo on screen.
         self.draw()
 
@@ -152,8 +153,12 @@ class BlurApp():
         self.photo = self.canvas.create_image(self.center, image=p)
         self.label = tk.Label(image=p)
         self.label.image = p
-        if self.heatmap_alpha_auto:
-            self.heat()
+        try:
+            if __class__.debug_cursors:
+                if self.heatmap_alpha_auto:
+                    self.heat()
+        except:
+            pass
 
     # Key Bindings #################
     def reset(self, event):
