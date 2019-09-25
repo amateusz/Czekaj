@@ -2,7 +2,7 @@ from PIL import Image, ImageTk, ImageColor
 import tkinter as tk
 from tkinter import filedialog
 from math import sqrt
-from random import random
+from random import random, shuffle, randint
 from colour import Color
 
 # Image 2 is on top of image 1.
@@ -47,11 +47,12 @@ def create_image(filename, width, height):
         return img.resize((int(w * scale), int(h * scale)), Image.ANTIALIAS)
 
 
-class HomeWindow():
+class BlurApp():
     """
     master: tk.Tk window.
     screen: tuple, (width, height).
     """
+    PURPLE = tuple([int((255 ** 2) * _) for _ in Color('purple').get_rgb()])
 
     def __init__(self, master, canvas_size, filenames=None):
         self.canvas_size = canvas_size  # policy: everything stretched to fill this size. no aspect preservation
@@ -69,9 +70,6 @@ class HomeWindow():
         # Start with no photo on the screen.
         self.photo = False
 
-        # Draw photo on screen.
-        self.draw()
-
         self.pos = []
 
         # for creating self transparent rectangles
@@ -80,7 +78,15 @@ class HomeWindow():
         # declare a heatmap
         self.heatmap_alpha_auto = 0
 
-        self.heatmap = [
+        # if both lists are empty, the the state is _steady_/_idle_ ^^.
+        self.tiles_to_unblur = []
+        self.splats_to_blur = []
+
+        # task retention
+        self.flush_blur_waypoints_task = None
+        self.bg_blur_task = None
+
+        self.HEATMAP = [
             [0.1, 0.1, 0.40, 0.60, 0.24, 0.1],
             [0.1, 0.18, 0.30, 0.50, 0.2, 0.1],
             [0.1, 0.15, 0.35, 0.45, 0.2, 0.1],
@@ -93,16 +99,16 @@ class HomeWindow():
         ]
 
         # size of heatmap tiles in pixels based on self.map 2d list and size of an image
-        self.heat_tile_w = self.canvas_size[0] / len(self.heatmap[0])
-        self.heat_tile_h = self.canvas_size[1] / len(self.heatmap)
+        self.heat_tile_w = self.canvas_size[0] / len(self.HEATMAP[0])
+        self.heat_tile_h = self.canvas_size[1] / len(self.HEATMAP)
 
         # value of targeted areas
         self.mask = .1
 
         # mask_list populates with indexes of matching values with self.mask after erase function is called
         self.mask_list = []
-        self.heat()
-        self.unblur()
+        # self.heat()
+        # self.unblur()
 
         # Key bindings.
         self.parent.bind('<Button-1>', self.click_callback)
@@ -110,10 +116,14 @@ class HomeWindow():
         self.parent.bind('<Escape>', self.parent.destroy)
         self.parent.bind("<Motion>", self.unblur_mouse)
 
+        # Draw photo on screen.
+        self.draw()
+
     def click_callback(self, event):
         if event.num == 1:
             self.heatmap_alpha_auto += 1 / 3
             self.heatmap_alpha_auto %= 1.01
+            self.draw()
 
     def loadImages(self, filenames=None):
         if not filenames or len(filenames) != 2:
@@ -139,6 +149,8 @@ class HomeWindow():
         self.photo = self.canvas.create_image(self.center, image=p)
         self.label = tk.Label(image=p)
         self.label.image = p
+        if self.heatmap_alpha_auto:
+            self.heat()
 
     # Key Bindings #################
     def reset(self, event):
@@ -146,84 +158,182 @@ class HomeWindow():
         self.frame.destroy()
         self.__init__(self.parent, self.canvas_size)
 
-    def unblur_mouse(self, event):
-        self.unblur()
+    def flush_unblur_waypoints(self):
+        if len(self.tiles_to_unblur) > 0:
+            tile = self.tiles_to_unblur.pop()
+            splat_centre = self.tile_to_abs(tile, .55)
+            self.unblur(*splat_centre)
+            self.frame.after(90, self.flush_unblur_waypoints)
 
-    def unblur(self, heat=None):
+    def flush_blur_waypoints(self):
+        if len(self.splats_to_blur) > 0:
+            splat_centre = self.splats_to_blur.pop(0)  # so the reverse order
+            self.blur(*splat_centre, .25)
+            self.flush_blur_waypoints_task = self.frame.after(130, self.flush_blur_waypoints)
+        else:
+            self.flush_blur_waypoints_task = None
+            self.blur_random()
+
+    def unblur_tile_routeplanner(self, heat):
+        """  it works like this:
+        with each unit there happens one unblur(heat) call.
+        this call is supposed to uncover _some_ of the surface of heat value of ≤
+        """
+        # prepare list of tiles of the heat and below
+        # not_hotter_tiles = [True for tile in [row for row in self.HEATMAP] if tile <= heat]
+
+        # here we'll collect results that should be unblurred
+        hot_enough = []
+
+        for row in range(len(self.HEATMAP)):
+            for column, value in enumerate(self.HEATMAP[row]):
+                if value <= heat:
+                    hot_enough.append([column, row])
+        # shuffle resulting list
+        shuffle(hot_enough)
+        # turncate resulting list
+        hot_enough = hot_enough[:int(len(hot_enough) * .35)]  # 35% will stay
+        # generate a path through remaining waypoints
+        self.tiles_to_unblur = hot_enough
+        self.flush_unblur_waypoints()
+
+    def tile_to_abs(self, heat_tile, randomize=False):
+        a = heat_tile[0] * self.heat_tile_w
+        b = heat_tile[1] * self.heat_tile_h
+        if not randomize:
+            # put at the centre
+            a += self.heat_tile_w / 2
+            b += self.heat_tile_h / 2
+        else:
+            # put anywhre in the self.heat_tile_| plane
+            a += random() * self.heat_tile_w * randomize
+            b += random() * self.heat_tile_h * randomize
+        return int(a), int(b)
+
+    def unblur_mouse(self, event):
+        self.unblur(event.x, event.y)
+
+    def unblur(self, a, b):
         """
         Mouse motion binding.
         Erase part of top image (self.photo2) at location (event.x, event.y),
         consequently exposing part of the bottom image (self.photo1).
         n - number of circles shown at any moment of time
-
-        it works like this:
         """
-        print(heat)
+
+        self.splats_to_blur.append((a, b))
+
         # a, b = event.x, event.y
         r = BRUSH
-        # self.pos.append((a, b))
-        n = 2
-        # mask_list = [(i for i, x in enumerate(self.map)) if x == self.mask]
 
-        # for vertical in range(len(self.heatmap)):
-        #     for i, horizontal in enumerate(self.heatmap[vertical]):
-        #         if horizontal == self.mask:
-        #             self.mask_list.append([i, vertical])
-        # print(self.mask_list)
-        for coords in self.mask_list:
-            a = int(coords[0] * self.heat_tile_w + self.heat_tile_w / 2)
-            b = int(coords[1] * self.heat_tile_h + self.heat_tile_h / 2)
-            for x in range(a - r, a + r + 1):
-                for y in range(b - r, b + r + 1):
-                    try:
-                        '''
-                        if (x - a) * (x - a) + (y - b) * (y - b) <= r * r * random() ** 2:  # version with organized grid
+        for x in range(a - r, a + r + 1):
+            for y in range(b - r, b + r + 1):
+                try:
+                    '''
+                    if (x - a) * (x - a) + (y - b) * (y - b) <= r * r * random() ** 2:  # version with organized grid
+                        p = self.image1.getpixel((x, y))
+                        self.image2.putpixel((x, y), p)
+                    elif r * r * 0.04 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.16:
+                        if x % 2 == 0 or y % 2 == 0:
                             p = self.image1.getpixel((x, y))
                             self.image2.putpixel((x, y), p)
-                        elif r * r * 0.04 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.16:
-                            if x % 2 == 0 or y % 2 == 0:
-                                p = self.image1.getpixel((x, y))
-                                self.image2.putpixel((x, y), p)
-                        elif r * r * 0.16 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.36:
-                            if x % 3 == 0 or y % 3 == 0:
-                                p = self.image1.getpixel((x, y))
-                                self.image2.putpixel((x, y), p)
-                        elif r * r * 0.36 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.64:
-                            if x % 4 == 0 or y % 4 == 0:
-                                p = self.image1.getpixel((x, y))
-                                self.image2.putpixel((x, y), p)
-                        elif r * r * 0.64 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r:
-                            if x % 5 == 0 or y % 5 == 0:
-                                p = self.image1.getpixel((x, y))
-                                self.image2.putpixel((x, y), p)
-                                '''
-                        if (x - a) * (x - a) + (y - b) * (
-                                y - b) <= r * r * random() ** 2:  # version with random gradient
-                            p = self.image_clear.getpixel((x, y))
-                            self.image_working.putpixel((x, y), p)
-
-                    except IndexError:
-                        pass
-
-        # Returning back to original image
-        if len(self.pos) > n:
-            for x in range(self.pos[0][0] - r, self.pos[0][0] + r + 1):
-                for y in range(self.pos[0][1] - r, self.pos[0][1] + r + 1):
+                    elif r * r * 0.16 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.36:
+                        if x % 3 == 0 or y % 3 == 0:
+                            p = self.image1.getpixel((x, y))
+                            self.image2.putpixel((x, y), p)
+                    elif r * r * 0.36 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.64:
+                        if x % 4 == 0 or y % 4 == 0:
+                            p = self.image1.getpixel((x, y))
+                            self.image2.putpixel((x, y), p)
+                    elif r * r * 0.64 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r:
+                        if x % 5 == 0 or y % 5 == 0:
+                            p = self.image1.getpixel((x, y))
+                            self.image2.putpixel((x, y), p)
+                            '''
+                    if (x - a) * (x - a) + (y - b) * (y - b) \
+                            <= (r / 2) ** 2 * ((random() * 1.5) ** 3):  # version with random gradient
+                        color = self.image_clear.getpixel((x, y))
+                        self.image_working.putpixel((x, y), color)
                     try:
-                        if (
-                                (x - self.pos[0][0]) * (x - self.pos[0][0]) + (y - self.pos[0][1]) * (
-                                y - self.pos[0][1]) <= r * r
-                                and random() > 0.7
-                        ):
-                            q = self.image_blurred.getpixel((x, y))
-                            self.image_working.putpixel((x, y), q)
-                    except IndexError:
+                        if __class__.debug_cursors:
+                            if (x - a) * (x - a) + (y - b) * (y - b) \
+                                    >= (r / 2.0) ** 2 \
+                                    and \
+                                    (x - a) * (x - a) + (y - b) * (y - b) \
+                                    <= (r / 1.9) ** 2:
+                                color = __class__.PURPLE
+                                self.image_working.putpixel((x, y), color)
+                    except:
                         pass
-            self.pos.pop(0)
-        # print(self.pos)
+
+                except IndexError:
+                    pass
         self.draw()
-        if self.heatmap_alpha_auto:
-            self.heat()
+
+        # if pending, then cancel.
+        if self.flush_blur_waypoints_task:
+            self.frame.after_cancel(self.flush_blur_waypoints_task)
+        # schedule it for 3sec from now. If a movement will happen, move the window.
+        self.flush_blur_waypoints_task = self.frame.after(3000, self.flush_blur_waypoints)
+
+        # also cancel pending bg blur
+        if self.bg_blur_task:
+            self.frame.after_cancel(self.bg_blur_task)
+
+    def blur_random(self, at_once=10):
+        '''
+        sparkling random fixing of the image
+        :param delay: in [ms]
+        :return:
+        '''
+
+        delay = 350
+
+        for i in range(at_once):
+            x, y = [randint(0, _ - 1) for _ in self.canvas_size]
+            color = self.image_blurred.getpixel((x, y))
+            try:
+                if __class__.debug_cursors:
+                    color = __class__.PURPLE
+            except:
+                pass
+
+            self.image_working.putpixel((x, y), color)
+        self.bg_blur_task = self.frame.after(delay, self.blur_random)
+        self.draw()
+
+    def blur(self, a, b, effectivness=1.0):
+        '''
+        blurs back the image to the default state
+        let's sey it works like this:
+        it randomly restores pixels to the original, which are inside no matter which were set
+        :return:
+        '''
+
+        r = BRUSH
+        # Returning back to original image
+
+        for x in range(a - r, a + r + 1):
+            for y in range(b - r, b + r + 1):
+                try:
+                    if (x - a) ** 2 + (y - b) ** 2 <= r ** 2:
+                        if effectivness != 1.0:
+                            if random() > effectivness:
+                                continue
+                        color = self.image_blurred.getpixel((x, y))
+                        self.image_working.putpixel((x, y), color)
+                        try:
+                            if __class__.debug_cursors:
+                                if (x - a) ** 2 + (y - b) ** 2 <= r ** 2 and \
+                                        (x - a) ** 2 + (y - b) ** 2 >= (r * .95) ** 2:
+                                    color = __class__.PURPLE
+                                self.image_working.putpixel((x, y), color)
+                        except:
+                            pass
+
+                except IndexError:
+                    pass
+        self.draw()
 
     # creating semi-transparent images
     def create_rectangle(self, x1, y1, x2, y2, **kwargs):
@@ -238,9 +348,9 @@ class HomeWindow():
 
     # draw a heatmap
     def heat(self):
-        for vertical in range(len(self.heatmap)):
-            for horizontal in range(len(self.heatmap[0])):
-                color = Color(hsl=(.9, 1, self.heatmap[vertical][horizontal] / 2))
+        for vertical in range(len(self.HEATMAP)):
+            for horizontal in range(len(self.HEATMAP[0])):
+                color = Color(hsl=(.9, 1, self.HEATMAP[vertical][horizontal] / 2))
                 self.create_rectangle(int(horizontal * self.heat_tile_w), \
                                       int(vertical * self.heat_tile_h), \
                                       int(horizontal * self.heat_tile_w + self.heat_tile_w), \
@@ -259,7 +369,7 @@ def main(window_size=None):
     root.geometry(f'{width}x{height}+{root.wm_maxsize()[0] - width}+0')
     root.update()  # no mainloop yet
     root.title('mgr Alka Czekaja. ten program: Eryk Czekaj × Mateusz Grzywacz')
-    blur_app = HomeWindow(root, (root.winfo_width(), root.winfo_height()), ['1.jpg', '2.jpg'])
+    blur_app = BlurApp(root, (root.winfo_width(), root.winfo_height()), ['1.jpg', '2.jpg'])
     root.mainloop()
 
 

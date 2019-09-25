@@ -18,17 +18,37 @@ class TestHomeWindow(TestCase):
         self.root.geometry(f'{width}x{height}+{self.root.wm_maxsize()[0] - width}+0')
         self.root.update()  # no mainloop yet
         self.root.title('mgr Alka Czekaja. ten program: Eryk Czekaj × Mateusz Grzywacz')
-        self.blur_app = Czekaj.HomeWindow(self.root, (self.root.winfo_width(), self.root.winfo_height()),
-                                          ['1.jpg', '2.jpg'])
+        self.blur_app = Czekaj.BlurApp(self.root, (self.root.winfo_width(), self.root.winfo_height()),
+                                       ['1.jpg', '2.jpg'])
+        Czekaj.BlurApp.debug_cursors = True
 
     def test_unblur(self):
+        ''''
+        press keys 0-9 in order to simulate _heat_
+        '''
+
         def generate_heat(event):
             if event.char >= '0' and event.char <= '9':
                 heat = int(event.char) / 10
                 if event.char == '0':
                     heat = 1.0
-                self.blur_app.unblur(heat)
+                self.blur_app.unblur_tile_routeplanner(heat)
 
         self.root.bind('<Key>', generate_heat)
+        self.root.mainloop()
 
+    def test_blur_waypoints(self):
+        splats = [[280, 300], [240, 40], [110, 170], [320, 100]]
+        for splat in splats:
+            self.blur_app.unblur(*splat)
+        self.root.update()
+        # self.root.after(3000, self.blur_app.flush_blur_waypoints)
+        self.root.mainloop()
+
+    def test_blur_backgroud(self):
+        self.blur_app.image_working = self.blur_app.image_clear.copy()
+        self.blur_app.draw()
+        self.root.update()
+
+        self.blur_app.blur_random(3000)
         self.root.mainloop()
