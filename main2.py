@@ -410,6 +410,17 @@ def main(window_size=None):
     root.update()  # no mainloop yet
     root.title('mgr Alka Czekaja. ten program: Eryk Czekaj × Mateusz Grzywacz')
     blur_app = BlurApp(root, (root.winfo_width(), root.winfo_height()), ['1.jpg', '2.jpg'])
+
+    from face_heat.face_class import Heat_Face
+    face_app = Heat_Face('haarcascade_frontalface_default.xml')
+
+    def forward_heat_to_blur_app():
+        heat = face_app.get_heat()
+        print(f'heat: {heat}')
+        blur_app.unblur_tile_routeplanner(heat)
+        root.after(200, forward_heat_to_blur_app)
+
+    root.after(1500, forward_heat_to_blur_app)
     root.mainloop()
 
 
