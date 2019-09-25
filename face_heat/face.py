@@ -57,7 +57,7 @@ while True:
         # print(position_x_delta)
         heat = sum([size_delta, position_x_delta, position_y_delta])
         heat = min(1.0, heat)
-        heat = max(0, heat)
+        heat = max(0.0, heat)
     else:
         # positions = []
         # sizes = [0,] * 20

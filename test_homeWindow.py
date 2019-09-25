@@ -6,7 +6,6 @@ import main2 as Czekaj
 
 
 class TestHomeWindow(TestCase):
-
     def setUp(self):
         window_size = (400, 650)
         self.root = tk.Tk()

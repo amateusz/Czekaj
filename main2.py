@@ -83,11 +83,11 @@ class BlurApp():
         self.bg_blur_task = None
 
         self.HEATMAP = [
-            [0.1, 0.1, 0.40, 0.60, 0.24, 0.1],
-            [0.1, 0.18, 0.30, 0.50, 0.2, 0.1],
-            [0.1, 0.15, 0.35, 0.45, 0.2, 0.1],
-            [0.1, 0.15, 0.35, 0.40, 0.2, 0.1],
-            [0.1, 0.1, 0.30, 0.35, 0.18, 0.1],
+            [0.1, 0.1, 0.50, 0.70, 0.24, 0.1],
+            [0.1, 0.18, 0.60, 0.60, 0.2, 0.1],
+            [0.1, 0.15, 0.45, 0.55, 0.2, 0.1],
+            [0.1, 0.15, 0.40, 0.50, 0.2, 0.1],
+            [0.1, 0.1, 0.36, 0.35, 0.18, 0.1],
             [0.1, 0.1, 0.20, 0.30, 0.17, 0.1],
             [0.1, 0.1, 0.15, 0.25, 0.16, 0.1],
             [0.1, 0.1, 0.15, 0.20, 0.13, 0.1],
@@ -178,10 +178,10 @@ class BlurApp():
         if len(self.splats_to_blur) > 0:
             splat_centre = self.splats_to_blur.pop(0)  # so the reverse order
             self.blur(*splat_centre, .25)
-            self.flush_blur_waypoints_task = self.frame.after(60, self.flush_blur_waypoints)
+            self.flush_blur_waypoints_task = self.frame.after(160, self.flush_blur_waypoints)
         else:
             self.flush_blur_waypoints_task = None
-            self.blur_random()
+            # self.blur_random()
 
     def unblur_tile_routeplanner(self, heat):
         """  it works like this:
@@ -287,9 +287,17 @@ class BlurApp():
 
         # if pending, then cancel.
         if self.flush_blur_waypoints_task:
-            self.frame.after_cancel(self.flush_blur_waypoints_task)
-        # schedule it for 3sec from now. If a movement will happen, move the window.
-        self.flush_blur_waypoints_task = self.frame.after(1800, self.flush_blur_waypoints)
+            # but not if the waypoint list is growing too much
+            if len(self.splats_to_blur) < 100:
+                self.frame.after_cancel(self.flush_blur_waypoints_task)
+                # schedule it for 3sec from now. If a movement will happen, move the window.
+                self.flush_blur_waypoints_task = self.frame.after(900, self.flush_blur_waypoints)
+            else:
+                # start immidiatelly
+                self.flush_blur_waypoints_task = self.frame.after(10, self.flush_blur_waypoints)
+        else:
+            self.flush_blur_waypoints_task = self.frame.after(900, self.flush_blur_waypoints)
+        # print(len(self.splats_to_blur))
 
         # also cancel pending bg blur
         if self.bg_blur_task:
@@ -412,13 +420,15 @@ def main(window_size=None):
     blur_app = BlurApp(root, (root.winfo_width(), root.winfo_height()), ['1.jpg', '2.jpg'])
 
     from face_heat.face_class import Heat_Face
-    face_app = Heat_Face('haarcascade_frontalface_default.xml')
+    face_app = Heat_Face('haarcascade_frontalface_default.xml', '/dev/video2')
 
     def forward_heat_to_blur_app():
         heat = face_app.get_heat()
-        print(f'heat: {heat}')
+        # print(f'heat: {heat}')
         blur_app.unblur_tile_routeplanner(heat)
-        root.after(200, forward_heat_to_blur_app)
+        # face_app.draw_heat(heat)
+        # face_app.display()
+        root.after(333, forward_heat_to_blur_app)
 
     root.after(1500, forward_heat_to_blur_app)
     root.mainloop()
