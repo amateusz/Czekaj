@@ -5,17 +5,12 @@ from math import sqrt
 from random import random, shuffle, randint
 from colour import Color
 
+
 # Image 2 is on top of image 1.
 
 
 # IMAGE1_DIR = "X:/python/obrazy/1.jpg"
 # IMAGE2_DIR = "X:/python/obrazy/2.jpg"
-
-# Brush size in pixels.
-BRUSH = 45
-
-
-# Actual size is 2*BRUSH
 
 
 def create_image(filename, width, height):
@@ -35,6 +30,7 @@ def create_image(filename, width, height):
     # Create a PIL image from the file.
     img = Image.open(filename, mode="r")
     img.putalpha(255)
+    # img.convert("RGBA")
 
     # Resize if necessary.
     if not width and not height:
@@ -102,6 +98,10 @@ class BlurApp():
         self.heat_tile_w = self.canvas_size[0] / len(self.HEATMAP[0])
         self.heat_tile_h = self.canvas_size[1] / len(self.HEATMAP)
 
+        # Brush size in pixels.
+        # Actual size is 2*BRUSH
+        self.BRUSH = int(min(self.heat_tile_h, self.heat_tile_w))
+
         # value of targeted areas
         self.mask = .1
 
@@ -139,6 +139,7 @@ class BlurApp():
         self.image_clear = create_image(fname1, width=self.canvas_size[0], height=self.canvas_size[1])
         self.image_working = create_image(fname2, width=self.canvas_size[0], height=self.canvas_size[1])
         self.image_blurred = create_image(fname2, width=self.canvas_size[0], height=self.canvas_size[1])
+        self.image_brush = Image.open('pedzel_szary.png')
 
     def draw(self):
         """
@@ -171,13 +172,13 @@ class BlurApp():
             tile = self.tiles_to_unblur.pop()
             splat_centre = self.tile_to_abs(tile, .55)
             self.unblur(*splat_centre)
-            self.frame.after(90, self.flush_unblur_waypoints)
+            self.frame.after(76, self.flush_unblur_waypoints)
 
     def flush_blur_waypoints(self):
         if len(self.splats_to_blur) > 0:
             splat_centre = self.splats_to_blur.pop(0)  # so the reverse order
             self.blur(*splat_centre, .25)
-            self.flush_blur_waypoints_task = self.frame.after(130, self.flush_blur_waypoints)
+            self.flush_blur_waypoints_task = self.frame.after(60, self.flush_blur_waypoints)
         else:
             self.flush_blur_waypoints_task = None
             self.blur_random()
@@ -232,57 +233,63 @@ class BlurApp():
         self.splats_to_blur.append((a, b))
 
         # a, b = event.x, event.y
-        r = BRUSH
 
-        for x in range(a - r, a + r + 1):
-            for y in range(b - r, b + r + 1):
-                try:
-                    '''
-                    if (x - a) * (x - a) + (y - b) * (y - b) <= r * r * random() ** 2:  # version with organized grid
-                        p = self.image1.getpixel((x, y))
-                        self.image2.putpixel((x, y), p)
-                    elif r * r * 0.04 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.16:
-                        if x % 2 == 0 or y % 2 == 0:
-                            p = self.image1.getpixel((x, y))
-                            self.image2.putpixel((x, y), p)
-                    elif r * r * 0.16 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.36:
-                        if x % 3 == 0 or y % 3 == 0:
-                            p = self.image1.getpixel((x, y))
-                            self.image2.putpixel((x, y), p)
-                    elif r * r * 0.36 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.64:
-                        if x % 4 == 0 or y % 4 == 0:
-                            p = self.image1.getpixel((x, y))
-                            self.image2.putpixel((x, y), p)
-                    elif r * r * 0.64 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r:
-                        if x % 5 == 0 or y % 5 == 0:
-                            p = self.image1.getpixel((x, y))
-                            self.image2.putpixel((x, y), p)
-                            '''
-                    if (x - a) * (x - a) + (y - b) * (y - b) \
-                            <= (r / 2) ** 2 * ((random() * 1.5) ** 3):  # version with random gradient
-                        color = self.image_clear.getpixel((x, y))
-                        self.image_working.putpixel((x, y), color)
-                    try:
-                        if __class__.debug_cursors:
-                            if (x - a) * (x - a) + (y - b) * (y - b) \
-                                    >= (r / 2.0) ** 2 \
-                                    and \
-                                    (x - a) * (x - a) + (y - b) * (y - b) \
-                                    <= (r / 1.9) ** 2:
-                                color = __class__.PURPLE
-                                self.image_working.putpixel((x, y), color)
-                    except:
-                        pass
+        brush_intermediate = Image.new('RGBA', self.canvas_size, (255, 255, 255, 0))
+        self.image_brush = self.image_brush.copy().rotate(random() * 11)
+        brush_intermediate.paste(self.image_brush, (a - self.image_brush.width, b - self.image_brush.height))
+        self.image_working.paste(self.image_clear, (0, 0), brush_intermediate)
 
-                except IndexError:
-                    pass
+        # r = self.BRUSH
+        #
+        # for x in range(a - r, a + r + 1):
+        #     for y in range(b - r, b + r + 1):
+        #         try:
+        #             '''
+        #             if (x - a) * (x - a) + (y - b) * (y - b) <= r * r * random() ** 2:  # version with organized grid
+        #                 p = self.image1.getpixel((x, y))
+        #                 self.image2.putpixel((x, y), p)
+        #             elif r * r * 0.04 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.16:
+        #                 if x % 2 == 0 or y % 2 == 0:
+        #                     p = self.image1.getpixel((x, y))
+        #                     self.image2.putpixel((x, y), p)
+        #             elif r * r * 0.16 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.36:
+        #                 if x % 3 == 0 or y % 3 == 0:
+        #                     p = self.image1.getpixel((x, y))
+        #                     self.image2.putpixel((x, y), p)
+        #             elif r * r * 0.36 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r * 0.64:
+        #                 if x % 4 == 0 or y % 4 == 0:
+        #                     p = self.image1.getpixel((x, y))
+        #                     self.image2.putpixel((x, y), p)
+        #             elif r * r * 0.64 < (x - a) * (x - a) + (y - b) * (y - b) <= r * r:
+        #                 if x % 5 == 0 or y % 5 == 0:
+        #                     p = self.image1.getpixel((x, y))
+        #                     self.image2.putpixel((x, y), p)
+        #                     '''
+        #             if (x - a) * (x - a) + (y - b) * (y - b) \
+        #                     <= (r / 2) ** 2 * ((random() * 1.5) ** 3):  # version with random gradient
+        #                 color = self.image_clear.getpixel((x, y))
+        #                 self.image_working.putpixel((x, y), color)
+        #             try:
+        #                 if __class__.debug_cursors:
+        #                     if (x - a) * (x - a) + (y - b) * (y - b) \
+        #                             >= (r / 2.0) ** 2 \
+        #                             and \
+        #                             (x - a) * (x - a) + (y - b) * (y - b) \
+        #                             <= (r / 1.9) ** 2:
+        #                         color = __class__.PURPLE
+        #                         self.image_working.putpixel((x, y), color)
+        #             except:
+        #                 pass
+        #
+        #         except IndexError:
+        #             pass
         self.draw()
 
         # if pending, then cancel.
         if self.flush_blur_waypoints_task:
             self.frame.after_cancel(self.flush_blur_waypoints_task)
         # schedule it for 3sec from now. If a movement will happen, move the window.
-        self.flush_blur_waypoints_task = self.frame.after(3000, self.flush_blur_waypoints)
+        self.flush_blur_waypoints_task = self.frame.after(1800, self.flush_blur_waypoints)
 
         # also cancel pending bg blur
         if self.bg_blur_task:
@@ -312,35 +319,60 @@ class BlurApp():
 
     def blur(self, a, b, effectivness=1.0):
         '''
+        @TODO: non-blocking. smoother animation. PLEASE
         blurs back the image to the default state
         let's sey it works like this:
         it randomly restores pixels to the original, which are inside no matter which were set
         :return:
+
         '''
 
-        r = BRUSH
-        # Returning back to original image
+        brush_intermediate = Image.new('RGBA', self.canvas_size, (255, 255, 255, 0))
+        self.image_brush = self.image_brush.copy().rotate(random() * 11)
+        brush_intermediate.paste(self.image_brush, (a - self.image_brush.width, b - self.image_brush.height))
+        self.image_working.paste(self.image_blurred, (0, 0), brush_intermediate)
 
-        for x in range(a - r, a + r + 1):
-            for y in range(b - r, b + r + 1):
-                try:
-                    if (x - a) ** 2 + (y - b) ** 2 <= r ** 2:
-                        if effectivness != 1.0:
-                            if random() > effectivness:
-                                continue
-                        color = self.image_blurred.getpixel((x, y))
-                        self.image_working.putpixel((x, y), color)
-                        try:
-                            if __class__.debug_cursors:
-                                if (x - a) ** 2 + (y - b) ** 2 <= r ** 2 and \
-                                        (x - a) ** 2 + (y - b) ** 2 >= (r * .95) ** 2:
-                                    color = __class__.PURPLE
-                                self.image_working.putpixel((x, y), color)
-                        except:
-                            pass
+        # r = self.BRUSH
+        # # Returning back to original image
+        #
+        # for x in range(a - r, a + r + 1):
+        #     for y in range(b - r, b + r + 1):
+        #         try:
+        #             dist = (x - a) ** 2 + (y - b) ** 2
+        #             if dist <= r ** 2:
+        #                 # circle only
+        #                 color = self.image_blurred.getpixel((x, y))
+        #                 color = (color[0], color[1], color[2], 255- int(255 / r ** 2 * dist))
+        #                 colorOld = self.image_working.getpixel((x,y))
+        #                 colorOld = (colorOld[0], colorOld[1], colorOld[2], int(255 / r ** 2 * dist))
+        #                 self.image_working.putpixel((x, y), color + colorOld)
+        #         except IndexError:
+        #             raise
 
-                except IndexError:
-                    pass
+        # for x in range(a - r, a + r + 1):
+        #     for y in range(b - r, b + r + 1):
+        #         try:
+        #             if (x - a) ** 2 + (y - b) ** 2 <= r ** 2:
+        #                 if effectivness != 1.0:
+        #                     if random() > effectivness:
+        #                         continue
+        #                 color = self.image_blurred.getpixel((x, y))
+        #                 color = __class__.PURPLE
+        #
+        #                 self.image_working.putpixel((x, y), color)
+        #                 try:
+        #                     if __class__.debug_cursors:
+        #                         if (x - a) ** 2 + (y - b) ** 2 <= r ** 2 and \
+        #                                 (x - a) ** 2 + (y - b) ** 2 >= (r * .95) ** 2:
+        #                             color = __class__.PURPLE
+        #                         self.image_working.putpixel((x, y), color)
+        #                         pixels_drawn_counter += 1
+        #                 except:
+        #                     pass
+        #
+        #         except IndexError:
+        #             pass
+
         self.draw()
 
     # creating semi-transparent images

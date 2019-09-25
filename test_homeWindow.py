@@ -68,7 +68,7 @@ class TestHomeWindowFullscreen(TestCase):
         self.blur_app = Czekaj.BlurApp(self.root, (self.root.winfo_width(), self.root.winfo_height()),
                                        ['1.jpg', '2.jpg'])
         self.root.title('mgr Alka Czekaja. ten program: Eryk Czekaj × Mateusz Grzywacz')
-        # Czekaj.BlurApp.debug_cursors = True
+        Czekaj.BlurApp.debug_cursors = True
 
     @skipUnless(sys.platform.startswith("win"), "requires Windows")
     def test_windows_support(self):
