@@ -113,11 +113,14 @@ class BlurApp():
         # Key bindings.
         self.parent.bind('<Button-1>', self.click_callback)
         self.parent.bind("<Return>", self.reset)
-        self.parent.bind('<Escape>', self.parent.destroy)
+        self.parent.bind('<Escape>', self.exit)
         self.parent.bind("<Motion>", self.unblur_mouse)
 
         # Draw photo on screen.
         self.draw()
+
+    def exit(self, event):
+        self.parent.destroy()
 
     def click_callback(self, event):
         if event.num == 1:

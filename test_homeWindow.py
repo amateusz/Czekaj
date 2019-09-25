@@ -52,3 +52,8 @@ class TestHomeWindow(TestCase):
 
         self.blur_app.blur_random(3000)
         self.root.mainloop()
+
+    def test_fullscreen(self):
+        self.root.attributes('-zoomed', True)
+        self.root.attributes('-fullscreen', True)
+        self.root.mainloop()
