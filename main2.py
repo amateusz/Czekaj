@@ -1,3 +1,20 @@
+try:
+    # If the _imaging C module is not present, Pillow will not load.
+    # Note that other modules should not refer to _imaging directly;
+    # import Image and use the Image.core variable instead.
+    # Also note that Image.core is not a publicly documented interface,
+    # and should be considered private and subject to change.
+    from PIL import _imaging
+    if PILLOW_VERSION != getattr(core, 'PILLOW_VERSION', None):
+        raise ImportError("The _imaging extension was built for another "
+                          "version of Pillow or PIL:\n"
+                          "Core version: %s\n"
+                          "Pillow version: %s" %
+                          (getattr(core, 'PILLOW_VERSION', None),
+                           PILLOW_VERSION))
+except Exception as e:
+    raise e
+
 from PIL import Image, ImageTk, ImageColor
 import tkinter as tk
 from tkinter import filedialog
@@ -172,7 +189,7 @@ class BlurApp():
             tile = self.tiles_to_unblur.pop()
             splat_centre = self.tile_to_abs(tile, .55)
             self.unblur(*splat_centre)
-            self.frame.after(76, self.flush_unblur_waypoints)
+            self.frame.after(500, self.flush_unblur_waypoints)
 
     def flush_blur_waypoints(self):
         if len(self.splats_to_blur) > 0:
@@ -420,14 +437,14 @@ def main(window_size=None):
     blur_app = BlurApp(root, (root.winfo_width(), root.winfo_height()), ['1.jpg', '2.jpg'])
 
     from face_heat.face_class import Heat_Face
-    face_app = Heat_Face('haarcascade_frontalface_default.xml', '/dev/video2')
+    face_app = Heat_Face('haarcascade_frontalface_default.xml', '/dev/video0')
 
     def forward_heat_to_blur_app():
         heat = face_app.get_heat()
         # print(f'heat: {heat}')
         blur_app.unblur_tile_routeplanner(heat)
-        # face_app.draw_heat(heat)
-        # face_app.display()
+        face_app.draw_heat(heat)
+        face_app.display()
         root.after(333, forward_heat_to_blur_app)
 
     root.after(1500, forward_heat_to_blur_app)
