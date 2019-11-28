@@ -180,7 +180,7 @@ class BlurApp():
         if len(self.splats_to_blur) > 0:
             splat_centre = self.splats_to_blur.pop(0)  # so the reverse order
             self.blur(*splat_centre, .25)
-            self.flush_blur_waypoints_task = self.frame.after(160, self.flush_blur_waypoints)
+            self.flush_blur_waypoints_task = self.frame.after(100, self.flush_blur_waypoints)
         else:
             self.flush_blur_waypoints_task = None
             # self.blur_random()
@@ -430,7 +430,7 @@ def main(window_size=None):
         blur_app.unblur_tile_routeplanner(heat)
         face_app.draw_heat(heat)
         face_app.display()
-        root.after(333, forward_heat_to_blur_app)
+        root.after(600, forward_heat_to_blur_app)
 
     root.after(1500, forward_heat_to_blur_app)
     root.mainloop()
